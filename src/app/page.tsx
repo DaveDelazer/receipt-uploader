@@ -119,6 +119,12 @@ type UploadedFile = {
   timestamp: Date;
 };
 
+// Add new type for selected image
+type SelectedImage = {
+  url: string;
+  fileName: string;
+} | null;
+
 export default function Home() {
   const [fileStatus, setFileStatus] = useState<FileStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -127,6 +133,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadHistory, setUploadHistory] = useState<UploadedFile[]>([]);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImage, setSelectedImage] = useState<SelectedImage>(null);
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -245,23 +252,29 @@ export default function Home() {
     }
   };
 
+  const handleImageClick = (url: string, fileName: string) => {
+    setSelectedImage({ url, fileName });
+  };
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-          Receipt Upload
+    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <div className="max-w-6xl mx-auto p-6 py-12">
+        <h1 className="text-4xl font-bold text-gray-800 mb-12 text-center tracking-tight">
+          Nuway Receipt Uploader
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Upload Section */}
           <div className="space-y-6">
             <div
               className={`
                 relative overflow-hidden
-                rounded-xl border-2 border-dashed p-8
-                transition-all duration-200 ease-in-out
-                ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
+                rounded-2xl border-2 border-dashed p-12
+                transition-all duration-300 ease-in-out
+                bg-white backdrop-blur-sm
+                ${isDragging ? 'border-blue-500 bg-blue-50/50 scale-[0.99]' : 'border-gray-200 hover:border-gray-300'}
                 ${fileStatus === 'processing' || fileStatus === 'uploading' ? 'opacity-50 pointer-events-none' : ''}
+                cursor-pointer group
               `}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -276,18 +289,18 @@ export default function Home() {
                 className="hidden"
               />
               
-              <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-col items-center gap-6">
                 {previewFile ? (
-                  <div className="relative w-48 h-48">
+                  <div className="relative w-56 h-56 rounded-xl overflow-hidden shadow-lg transition-transform duration-300 group-hover:scale-105">
                     <Image
                       src={previewFile.previewUrl}
                       alt="Preview"
                       fill
-                      className="object-contain rounded-lg"
+                      className="object-cover"
                     />
                   </div>
                 ) : (
-                  <div className="rounded-full bg-blue-50 p-4">
+                  <div className="rounded-full bg-blue-50 p-6 transition-transform duration-300 group-hover:scale-110">
                     <Image
                       src="/upload-icon.svg"
                       alt="Upload"
@@ -300,18 +313,30 @@ export default function Home() {
                 
                 <div className="text-center">
                   {fileStatus === 'processing' ? (
-                    <p className="text-blue-600 animate-pulse">Processing file...</p>
+                    <p className="text-blue-600 animate-pulse flex items-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing file...
+                    </p>
                   ) : fileStatus === 'uploading' ? (
-                    <p className="text-blue-600 animate-pulse">Uploading...</p>
+                    <p className="text-blue-600 animate-pulse flex items-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Uploading...
+                    </p>
                   ) : (
                     <>
-                      <p className="text-lg font-medium text-gray-700">
-                        Drop your file here
+                      <p className="text-xl font-medium text-gray-700 mb-2">
+                        Drop your receipt here
                       </p>
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-gray-500">
                         or click to select
                       </p>
-                      <p className="text-xs text-gray-400 mt-2">
+                      <p className="text-xs text-gray-400 mt-4 border border-gray-100 rounded-full px-4 py-2 inline-block">
                         Supports JPEG, PNG, HEIC, and PDF
                       </p>
                     </>
@@ -322,10 +347,10 @@ export default function Home() {
 
             <div className="flex gap-4">
               <button
-                className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg 
-                  hover:bg-blue-700 transition-colors duration-200
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  flex items-center justify-center gap-2"
+                className="flex-1 bg-gradient-to-br from-blue-500 to-blue-600 text-white py-4 px-6 rounded-xl
+                  hover:from-blue-600 hover:to-blue-700 transition-all duration-300
+                  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-500 disabled:hover:to-blue-600
+                  flex items-center justify-center gap-3 shadow-md hover:shadow-lg active:scale-[0.98]"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={fileStatus === 'processing' || fileStatus === 'uploading'}
               >
@@ -337,15 +362,11 @@ export default function Home() {
               </button>
 
               <button
-                className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg 
-                  hover:bg-green-700 transition-colors duration-200
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  flex items-center justify-center gap-2"
-                onClick={() => {
-                  if (cameraInputRef.current) {
-                    cameraInputRef.current.click();
-                  }
-                }}
+                className="flex-1 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white py-4 px-6 rounded-xl
+                  hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300
+                  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-emerald-500 disabled:hover:to-emerald-600
+                  flex items-center justify-center gap-3 shadow-md hover:shadow-lg active:scale-[0.98]"
+                onClick={() => cameraInputRef.current?.click()}
                 disabled={fileStatus === 'processing' || fileStatus === 'uploading'}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -368,8 +389,10 @@ export default function Home() {
 
             {(fileStatus === 'success' || fileStatus === 'error') && (
               <div className={`
-                rounded-lg p-4 text-center transition-all duration-200
-                ${fileStatus === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}
+                rounded-xl p-4 text-center transition-all duration-300 animate-fade-in
+                ${fileStatus === 'success' 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                  : 'bg-red-50 text-red-700 border border-red-100'}
               `}>
                 {fileStatus === 'success' ? 'Upload successful!' : errorMessage || 'Upload failed. Please try again.'}
               </div>
@@ -377,29 +400,47 @@ export default function Home() {
           </div>
 
           {/* Upload History Section */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Upload History</h2>
+          <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100/50 backdrop-blur-sm">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6 flex items-center gap-3">
+              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Upload History
+            </h2>
             {uploadHistory.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No uploads yet
+              <div className="text-center py-12 text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+                <p>No uploads yet</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-2 -mr-2">
                 {uploadHistory.map((item) => (
-                  <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                  <div 
+                    key={item.id} 
+                    className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 shadow-md 
+                      transition-all duration-300 hover:shadow-xl hover:scale-[1.02] group cursor-pointer"
+                    onClick={() => handleImageClick(item.previewUrl, item.fileName)}
+                  >
                     <Image
                       src={item.previewUrl}
                       alt={item.fileName}
                       fill
                       className="object-cover"
                     />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2">
-                      <p className="text-white text-xs truncate">
-                        {item.fileName}
-                      </p>
-                      <p className="text-gray-300 text-xs">
-                        {new Date(item.timestamp).toLocaleTimeString()}
-                      </p>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/0 to-transparent 
+                      opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="text-white text-sm font-medium truncate">
+                          {item.fileName}
+                        </p>
+                        <p className="text-gray-300 text-xs">
+                          {new Date(item.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -408,6 +449,38 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Image Preview Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-5xl w-full max-h-[90vh] bg-white rounded-2xl overflow-hidden">
+            <div className="absolute top-4 right-4 z-10">
+              <button 
+                className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                onClick={() => setSelectedImage(null)}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="relative aspect-[4/3] w-full">
+              <Image
+                src={selectedImage.url}
+                alt={selectedImage.fileName}
+                fill
+                className="object-contain"
+              />
+            </div>
+            <div className="p-4 bg-white border-t">
+              <p className="text-gray-700 font-medium">{selectedImage.fileName}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
