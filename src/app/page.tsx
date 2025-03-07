@@ -111,12 +111,22 @@ async function convertPdfToJpeg(file: File): Promise<File> {
   }
 }
 
+// Add new type for upload history
+type UploadedFile = {
+  id: string;
+  previewUrl: string;
+  fileName: string;
+  timestamp: Date;
+};
+
 export default function Home() {
   const [fileStatus, setFileStatus] = useState<FileStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadHistory, setUploadHistory] = useState<UploadedFile[]>([]);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -215,8 +225,19 @@ export default function Home() {
 
       if (!response.ok) throw new Error('Upload failed');
       
+      // After successful upload, add to history
+      setUploadHistory(prev => [{
+        id: Math.random().toString(36).substring(7),
+        previewUrl: previewUrl,
+        fileName: processedFile.name,
+        timestamp: new Date()
+      }, ...prev]);
+
       setFileStatus('success');
-      setTimeout(() => setFileStatus('idle'), 3000);
+      setTimeout(() => {
+        setFileStatus('idle');
+        setPreviewFile(null); // Clear preview after success
+      }, 3000);
     } catch (error) {
       console.error('Processing/Upload error:', error);
       setFileStatus('error');
@@ -225,89 +246,167 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-4 flex flex-col items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center mb-8 text-gray-800">
-          File Upload
+    <main className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto p-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
+          Receipt Upload
         </h1>
 
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-            ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
-            ${fileStatus === 'processing' || fileStatus === 'uploading' ? 'opacity-50 pointer-events-none' : ''}`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileInput}
-            accept="image/*,.heic,.heif,.pdf"
-            className="hidden"
-            capture="environment"
-          />
-          
-          <div className="flex flex-col items-center gap-4">
-            {previewFile ? (
-              <div className="relative w-48 h-48">
-                <Image
-                  src={previewFile.previewUrl}
-                  alt="Preview"
-                  fill
-                  className="object-contain rounded-lg"
-                />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Upload Section */}
+          <div className="space-y-6">
+            <div
+              className={`
+                relative overflow-hidden
+                rounded-xl border-2 border-dashed p-8
+                transition-all duration-200 ease-in-out
+                ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
+                ${fileStatus === 'processing' || fileStatus === 'uploading' ? 'opacity-50 pointer-events-none' : ''}
+              `}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileInput}
+                accept="image/*,.heic,.heif,.pdf"
+                className="hidden"
+              />
+              
+              <div className="flex flex-col items-center gap-4">
+                {previewFile ? (
+                  <div className="relative w-48 h-48">
+                    <Image
+                      src={previewFile.previewUrl}
+                      alt="Preview"
+                      fill
+                      className="object-contain rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-full bg-blue-50 p-4">
+                    <Image
+                      src="/upload-icon.svg"
+                      alt="Upload"
+                      width={48}
+                      height={48}
+                      className="opacity-70"
+                    />
+                  </div>
+                )}
+                
+                <div className="text-center">
+                  {fileStatus === 'processing' ? (
+                    <p className="text-blue-600 animate-pulse">Processing file...</p>
+                  ) : fileStatus === 'uploading' ? (
+                    <p className="text-blue-600 animate-pulse">Uploading...</p>
+                  ) : (
+                    <>
+                      <p className="text-lg font-medium text-gray-700">
+                        Drop your file here
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        or click to select
+                      </p>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Supports JPEG, PNG, HEIC, and PDF
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg 
+                  hover:bg-blue-700 transition-colors duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center justify-center gap-2"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={fileStatus === 'processing' || fileStatus === 'uploading'}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Select File
+              </button>
+
+              <button
+                className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg 
+                  hover:bg-green-700 transition-colors duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center justify-center gap-2"
+                onClick={() => {
+                  if (cameraInputRef.current) {
+                    cameraInputRef.current.click();
+                  }
+                }}
+                disabled={fileStatus === 'processing' || fileStatus === 'uploading'}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Take Photo
+              </button>
+              <input
+                type="file"
+                ref={cameraInputRef}
+                onChange={handleFileInput}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
+            </div>
+
+            {(fileStatus === 'success' || fileStatus === 'error') && (
+              <div className={`
+                rounded-lg p-4 text-center transition-all duration-200
+                ${fileStatus === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}
+              `}>
+                {fileStatus === 'success' ? 'Upload successful!' : errorMessage || 'Upload failed. Please try again.'}
+              </div>
+            )}
+          </div>
+
+          {/* Upload History Section */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Upload History</h2>
+            {uploadHistory.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No uploads yet
               </div>
             ) : (
-              <Image
-                src="/upload-icon.svg"
-                alt="Upload"
-                width={48}
-                height={48}
-                className="opacity-50"
-              />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {uploadHistory.map((item) => (
+                  <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                    <Image
+                      src={item.previewUrl}
+                      alt={item.fileName}
+                      fill
+                      className="object-cover"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-2">
+                      <p className="text-white text-xs truncate">
+                        {item.fileName}
+                      </p>
+                      <p className="text-gray-300 text-xs">
+                        {new Date(item.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-            
-            <div className="text-gray-600">
-              {fileStatus === 'processing' ? (
-                <p>Processing file...</p>
-              ) : fileStatus === 'uploading' ? (
-                <p>Uploading...</p>
-              ) : (
-                <>
-                  <p className="font-medium">Drop your file here</p>
-                  <p className="text-sm mt-1">or click to select</p>
-                  <p className="text-xs mt-2 text-gray-500">
-                    Supports JPEG, PNG, HEIC, and PDF
-                  </p>
-                </>
-              )}
-            </div>
           </div>
         </div>
-
-        {fileStatus === 'success' && (
-          <div className="mt-4 p-4 bg-green-100 text-green-700 rounded-lg text-center">
-            Upload successful!
-          </div>
-        )}
-
-        {fileStatus === 'error' && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg text-center">
-            {errorMessage || 'Upload failed. Please try again.'}
-          </div>
-        )}
-
-        <button
-          className="mt-4 w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors
-            disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={fileStatus === 'processing' || fileStatus === 'uploading'}
-        >
-          {fileStatus === 'processing' ? 'Processing...' : 
-           fileStatus === 'uploading' ? 'Uploading...' : 'Take a Photo'}
-        </button>
       </div>
     </main>
   );
