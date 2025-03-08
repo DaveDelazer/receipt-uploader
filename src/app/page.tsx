@@ -49,24 +49,21 @@ async function convertHeicToJpeg(file: File): Promise<File> {
   }
 }
 
-// @ts-ignore
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// @ts-expect-error - PDFjs types
 declare global {
   interface Window {
     pdfjsLib: any;
   }
 }
 
-// @ts-ignore
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// @ts-expect-error - PDFjs conversion function
 async function convertPdfToJpeg(file: File): Promise<File> {
   if (typeof window === 'undefined') {
     throw new Error('PDF conversion can only happen in browser');
   }
 
   try {
-    // @ts-ignore
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // @ts-expect-error - PDFjs import
     const pdfjsLib = await import('pdfjs-dist/webpack');
     // Set worker path 
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
