@@ -11,7 +11,13 @@ declare module 'heic2any' {
 }
 
 declare module 'pdfjs-dist/webpack' {
-  export * from 'pdfjs-dist';
+  import { PDFDocumentProxy, GlobalWorkerOptions } from 'pdfjs-dist';
+  
+  export const getDocument: (data: ArrayBuffer | Uint8Array) => Promise<PDFDocumentProxy>;
+  export const GlobalWorkerOptions: {
+    workerSrc: string;
+  };
+  export const version: string;
 }
 
 declare global {

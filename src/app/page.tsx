@@ -2,7 +2,6 @@
 
 import { useState, useRef, DragEvent, ChangeEvent } from 'react';
 import Image from 'next/image';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 // Utility types
 type FileStatus = 'idle' | 'processing' | 'uploading' | 'success' | 'error';
