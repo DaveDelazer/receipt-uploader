@@ -49,7 +49,6 @@ async function convertHeicToJpeg(file: File): Promise<File> {
   }
 }
 
-// @ts-expect-error - PDFjs conversion function
 async function convertPdfToJpeg(file: File): Promise<File> {
   if (typeof window === 'undefined') {
     throw new Error('PDF conversion can only happen in browser');
