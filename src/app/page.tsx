@@ -2,6 +2,7 @@
 
 import { useState, useRef, DragEvent, ChangeEvent } from 'react';
 import Image from 'next/image';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 // Utility types
 type FileStatus = 'idle' | 'processing' | 'uploading' | 'success' | 'error';
@@ -49,13 +50,6 @@ async function convertHeicToJpeg(file: File): Promise<File> {
   }
 }
 
-// @ts-expect-error - PDFjs types
-declare global {
-  interface Window {
-    pdfjsLib: any;
-  }
-}
-
 // @ts-expect-error - PDFjs conversion function
 async function convertPdfToJpeg(file: File): Promise<File> {
   if (typeof window === 'undefined') {
@@ -63,12 +57,9 @@ async function convertPdfToJpeg(file: File): Promise<File> {
   }
 
   try {
-    // @ts-expect-error - PDFjs import
     const pdfjsLib = await import('pdfjs-dist/webpack');
-    // Set worker path 
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-    // Load and render PDF
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
     const page = await pdf.getPage(1);
