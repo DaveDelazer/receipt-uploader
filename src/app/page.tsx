@@ -55,19 +55,28 @@ async function convertPdfToJpeg(file: File): Promise<File> {
   }
 
   try {
-    const pdfjsLib = await import('pdfjs-dist/webpack');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    const pdfjsLib = await import('pdfjs-dist');
+    // Update worker path to use CDN
+    const workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
+    // Add error logging
+    console.log('Converting PDF:', file.name);
+    
     const arrayBuffer = await file.arrayBuffer();
+    console.log('PDF loaded to buffer');
+    
     const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
+    console.log('PDF parsed');
+    
     const page = await pdf.getPage(1);
+    console.log('Page loaded');
 
-    // Create canvas
+    const viewport = page.getViewport({ scale: 2.0 });
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Could not get canvas context');
 
-    const viewport = page.getViewport({ scale: 2.0 });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
 
@@ -75,31 +84,36 @@ async function convertPdfToJpeg(file: File): Promise<File> {
     context.fillStyle = 'white';
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Render PDF page to canvas
-    await page.render({
-      canvasContext: context,
-      viewport: viewport,
-      background: 'white'
-    }).promise;
+    try {
+      await page.render({
+        canvasContext: context,
+        viewport: viewport,
+        background: 'white'
+      }).promise;
+      console.log('PDF rendered to canvas');
 
-    // Convert to JPEG
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Failed to convert PDF to image'));
-        },
-        'image/jpeg',
-        0.95
-      );
-    });
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Failed to convert canvas to blob'));
+          },
+          'image/jpeg',
+          0.95
+        );
+      });
+      console.log('Canvas converted to blob');
 
-    return new File([blob], file.name.replace(/\.pdf$/i, '.jpg'), {
-      type: 'image/jpeg'
-    });
+      return new File([blob], file.name.replace(/\.pdf$/i, '.jpg'), {
+        type: 'image/jpeg'
+      });
+    } catch (renderError) {
+      console.error('PDF render error:', renderError);
+      throw renderError;
+    }
   } catch (error) {
     console.error('PDF conversion failed:', error);
-    throw new Error('Failed to convert PDF');
+    throw error;
   }
 }
 
@@ -165,17 +179,22 @@ export default function Home() {
         throw new Error('File size exceeds 10MB limit');
       }
 
-      // Process file based on type
       let processedFile: File;
-      const fileName = file.name.toLowerCase();
+      let previewUrl: string;
 
-      if (fileName.endsWith('.heic') || fileName.endsWith('.heif')) {
+      console.log('Processing file:', file.name, file.type);
+
+      if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
         processedFile = await convertHeicToJpeg(file);
+        previewUrl = await createImagePreview(processedFile);
       } else if (isPdfFile(file)) {
+        console.log('Converting PDF to JPEG');
         processedFile = await convertPdfToJpeg(file);
+        previewUrl = await createImagePreview(processedFile);
       } else if (isImageFile(file)) {
         if (file.type === 'image/jpeg' || file.type === 'image/png') {
           processedFile = file;
+          previewUrl = await createImagePreview(processedFile);
         } else {
           // Convert other image formats to JPEG
           const canvas = document.createElement('canvas');
@@ -199,13 +218,13 @@ export default function Home() {
           processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
             type: 'image/jpeg'
           });
+          previewUrl = await createImagePreview(processedFile);
         }
       } else {
         throw new Error('Unsupported file type');
       }
 
       // Create preview
-      const previewUrl = await createImagePreview(processedFile);
       setPreviewFile({ file: processedFile, previewUrl });
 
       // Upload file
@@ -238,9 +257,9 @@ export default function Home() {
         setPreviewFile(null); // Clear preview after success
       }, 3000);
     } catch (error) {
-      console.error('Processing/Upload error:', error);
+      console.error('File processing error:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to process file');
       setFileStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Unknown error occurred');
     }
   };
 
