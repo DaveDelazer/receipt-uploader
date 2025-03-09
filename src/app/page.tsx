@@ -69,69 +69,71 @@ async function initPdfJs() {
 }
 
 async function convertPdfToJpeg(file: File): Promise<File> {
+  console.log('[PDF] Starting conversion process');
+  
   if (typeof window === 'undefined') {
     throw new Error('PDF conversion can only happen in browser');
   }
 
   try {
+    console.log('[PDF] Initializing PDF.js');
     const pdfjsLib = await initPdfJs();
-    console.log('Starting PDF conversion:', file.name);
-
+    
+    console.log('[PDF] Loading file into buffer');
     const arrayBuffer = await file.arrayBuffer();
-    console.log('File loaded to buffer, size:', arrayBuffer.byteLength);
+    console.log('[PDF] Buffer loaded, size:', arrayBuffer.byteLength);
 
-    try {
-      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-      const pdf = await loadingTask.promise;
-      console.log('PDF document loaded, pages:', pdf.numPages);
+    console.log('[PDF] Creating document');
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdf = await loadingTask.promise;
+    console.log('[PDF] Document loaded, pages:', pdf.numPages);
 
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 2.0 });
-      console.log('PDF page loaded, viewport:', viewport.width, 'x', viewport.height);
+    console.log('[PDF] Getting first page');
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 2.0 });
+    console.log('[PDF] Viewport created:', viewport.width, 'x', viewport.height);
 
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
 
-      const context = canvas.getContext('2d');
-      if (!context) {
-        throw new Error('Failed to get canvas context');
-      }
-
-      // Set white background
-      context.fillStyle = 'white';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      await page.render({
-        canvasContext: context,
-        viewport: viewport,
-        background: 'white'
-      }).promise;
-
-      return await new Promise((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Failed to convert canvas to blob'));
-              return;
-            }
-            const convertedFile = new File([blob], file.name.replace(/\.pdf$/i, '.jpg'), {
-              type: 'image/jpeg'
-            });
-            console.log('PDF converted to JPEG:', convertedFile.size, 'bytes');
-            resolve(convertedFile);
-          },
-          'image/jpeg',
-          0.95
-        );
-      });
-    } catch (error: unknown) {
-      console.error('PDF processing error:', error);
-      throw new Error('Failed to process PDF: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Failed to get canvas context');
     }
-  } catch (error: unknown) {
-    console.error('PDF conversion failed:', error);
-    throw new Error('PDF conversion failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+
+    console.log('[PDF] Rendering to canvas');
+    await page.render({
+      canvasContext: context,
+      viewport: viewport,
+      background: 'white'
+    }).promise;
+    console.log('[PDF] Rendered to canvas');
+
+    console.log('[PDF] Converting to JPEG');
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Failed to convert canvas to blob'));
+            return;
+          }
+          resolve(blob);
+        },
+        'image/jpeg',
+        0.95
+      );
+    });
+
+    const convertedFile = new File([blob], file.name.replace(/\.pdf$/i, '.jpg'), {
+      type: 'image/jpeg'
+    });
+    console.log('[PDF] Conversion complete:', convertedFile.size, 'bytes');
+
+    return convertedFile;
+  } catch (error) {
+    console.error('[PDF] Conversion failed:', error);
+    throw error;
   }
 }
 
@@ -187,95 +189,106 @@ export default function Home() {
 
   const processAndUploadFile = async (file: File) => {
     try {
+      console.log('[Upload Start]', {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: new Date(file.lastModified).toISOString()
+      });
+
       setFileStatus('processing');
       setErrorMessage('');
       setPreviewFile(null);
 
-      // Validate file size
-      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error('File size exceeds 10MB limit');
-      }
-
       let processedFile: File;
       let previewUrl: string;
 
-      console.log('Processing file:', file.name, file.type);
-
-      if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
-        processedFile = await convertHeicToJpeg(file);
-        previewUrl = await createImagePreview(processedFile);
-      } else if (isPdfFile(file)) {
-        console.log('Converting PDF to JPEG');
-        processedFile = await convertPdfToJpeg(file);
-        previewUrl = await createImagePreview(processedFile);
-      } else if (isImageFile(file)) {
-        if (file.type === 'image/jpeg' || file.type === 'image/png') {
+      try {
+        if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+          console.log('[HEIC] Starting conversion');
+          processedFile = await convertHeicToJpeg(file);
+          console.log('[HEIC] Conversion complete');
+        } else if (isPdfFile(file)) {
+          console.log('[PDF] Starting conversion');
+          processedFile = await convertPdfToJpeg(file);
+          console.log('[PDF] Conversion complete');
+        } else if (isImageFile(file)) {
+          console.log('[Image] Processing direct upload');
           processedFile = file;
-          previewUrl = await createImagePreview(processedFile);
         } else {
-          // Convert other image formats to JPEG
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const img = document.createElement('img');
-          
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = URL.createObjectURL(file);
-          });
-          
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx!.drawImage(img, 0, 0);
-          
-          const blob = await new Promise<Blob>((resolve) => {
-            canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8);
-          });
-          
-          processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
-            type: 'image/jpeg'
-          });
-          previewUrl = await createImagePreview(processedFile);
+          throw new Error(`Unsupported file type: ${file.type}`);
         }
-      } else {
-        throw new Error('Unsupported file type');
+
+        console.log('[Processing] Success', {
+          originalName: file.name,
+          processedName: processedFile.name,
+          processedType: processedFile.type,
+          processedSize: processedFile.size
+        });
+      } catch (error) {
+        console.error('[Processing] Failed', error);
+        throw error;
       }
 
-      // Create preview
-      setPreviewFile({ file: processedFile, previewUrl });
+      try {
+        console.log('[Preview] Creating');
+        previewUrl = await createImagePreview(processedFile);
+        console.log('[Preview] Created successfully');
+        setPreviewFile({ file: processedFile, previewUrl });
+      } catch (error) {
+        console.error('[Preview] Creation failed', error);
+        throw error;
+      }
 
-      // Upload file
-      setFileStatus('uploading');
-      const formData = new FormData();
-      formData.append('file', processedFile);
-      formData.append('originalFileName', file.name);
-      formData.append('processedFileName', processedFile.name);
-      formData.append('fileType', processedFile.type);
-      formData.append('fileSize', processedFile.size.toString());
+      try {
+        console.log('[Upload] Starting webhook upload');
+        setFileStatus('uploading');
 
-      const response = await fetch(process.env.NEXT_PUBLIC_WEBHOOK_URL!, {
-        method: 'POST',
-        body: formData,
-      });
+        const formData = new FormData();
+        formData.append('file', processedFile);
 
-      if (!response.ok) throw new Error('Upload failed');
-      
-      // After successful upload, add to history
-      setUploadHistory(prev => [{
-        id: Math.random().toString(36).substring(7),
-        previewUrl: previewUrl,
-        fileName: processedFile.name,
-        timestamp: new Date()
-      }, ...prev]);
+        const webhookUrl = process.env.NEXT_PUBLIC_WEBHOOK_URL;
+        if (!webhookUrl) {
+          throw new Error('Webhook URL not configured');
+        }
 
-      setFileStatus('success');
-      setTimeout(() => {
-        setFileStatus('idle');
-        setPreviewFile(null); // Clear preview after success
-      }, 3000);
+        console.log('[Upload] Sending to webhook:', webhookUrl);
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          body: formData
+        });
+
+        console.log('[Upload] Response received', {
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText
+        });
+
+        if (!response.ok) {
+          const responseText = await response.text();
+          console.error('[Upload] Response error details:', responseText);
+          throw new Error(`Upload failed with status ${response.status}: ${response.statusText}`);
+        }
+
+        // Add to upload history
+        const newUpload: UploadedFile = {
+          id: Date.now().toString(),
+          fileName: processedFile.name,
+          previewUrl,
+          timestamp: new Date()
+        };
+
+        setUploadHistory(prev => [newUpload, ...prev]);
+        setFileStatus('success');
+        console.log('[Upload] Completed successfully');
+
+      } catch (error) {
+        console.error('[Upload] Failed', error);
+        throw error;
+      }
+
     } catch (error) {
-      console.error('File processing error:', error);
+      console.error('[Process] Final error:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Failed to process file');
       setFileStatus('error');
     }
