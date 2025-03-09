@@ -51,6 +51,11 @@ async function convertHeicToJpeg(file: File): Promise<File> {
 
 async function initPdfJs() {
   try {
+    // Polyfill for canvas in Node environment
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
     const pdfjsLib = await import('pdfjs-dist');
     
     // Force HTTPS for the worker URL
