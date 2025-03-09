@@ -51,10 +51,11 @@ async function convertHeicToJpeg(file: File): Promise<File> {
 
 async function initPdfJs() {
   try {
-    const pdfjsLib = await import('pdfjs-dist/webpack');
+    const pdfjsLib = await import('pdfjs-dist');
+    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
+    
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      console.log('Initializing PDF.js worker');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default;
     }
     return pdfjsLib;
   } catch (error) {

@@ -5,9 +5,10 @@ const nextConfig = {
   },
   webpack: (config) => {
     config.resolve.alias.canvas = false;
-    // Add support for PDF.js worker
-    config.resolve.alias['pdfjs-dist'] = 'pdfjs-dist/webpack';
-    // Add fallback for worker
+    
+    // Remove the pdfjs-dist webpack alias
+    // config.resolve.alias['pdfjs-dist'] = 'pdfjs-dist/webpack';
+    
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
