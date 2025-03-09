@@ -8,6 +8,8 @@ declare module 'heic2any' {
   export default heic2any;
 }
 
+declare module 'pdfjs-dist';
+
 declare module 'pdfjs-dist/webpack';
 
 declare module 'pdfjs-dist/build/pdf.worker.entry' {

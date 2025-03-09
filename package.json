@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@pdf-lib/upng": "^1.0.1",
     "heic2any": "^0.0.4",
     "next": "15.2.1",
     "pdfjs-dist": "^3.11.174",

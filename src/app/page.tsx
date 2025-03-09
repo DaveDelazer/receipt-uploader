@@ -53,8 +53,8 @@ async function initPdfJs() {
   try {
     const pdfjsLib = await import('pdfjs-dist');
     
-    // Set worker directly
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    // Force HTTPS for the worker URL
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     
     return pdfjsLib;
   } catch (error) {
@@ -75,34 +75,33 @@ async function convertPdfToJpeg(file: File): Promise<File> {
     const arrayBuffer = await file.arrayBuffer();
     console.log('File loaded to buffer, size:', arrayBuffer.byteLength);
 
-    const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
-    const pdf = await loadingTask.promise;
-    console.log('PDF document loaded, pages:', pdf.numPages);
-
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 2.0 });
-    console.log('PDF page loaded, viewport:', viewport.width, 'x', viewport.height);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new Error('Failed to get canvas context');
-    }
-
-    // Set white background
-    context.fillStyle = 'white';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
     try {
+      const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+      const pdf = await loadingTask.promise;
+      console.log('PDF document loaded, pages:', pdf.numPages);
+
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 2.0 });
+      console.log('PDF page loaded, viewport:', viewport.width, 'x', viewport.height);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      const context = canvas.getContext('2d');
+      if (!context) {
+        throw new Error('Failed to get canvas context');
+      }
+
+      // Set white background
+      context.fillStyle = 'white';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
       await page.render({
         canvasContext: context,
         viewport: viewport,
         background: 'white'
       }).promise;
-      console.log('PDF rendered to canvas');
 
       return await new Promise((resolve, reject) => {
         canvas.toBlob(
@@ -122,8 +121,8 @@ async function convertPdfToJpeg(file: File): Promise<File> {
         );
       });
     } catch (error: unknown) {
-      console.error('PDF render error:', error);
-      throw new Error('Failed to render PDF: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('PDF processing error:', error);
+      throw new Error('Failed to process PDF: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   } catch (error: unknown) {
     console.error('PDF conversion failed:', error);
