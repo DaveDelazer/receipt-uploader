@@ -2,6 +2,7 @@
 
 import { useState, useRef, DragEvent, ChangeEvent } from 'react';
 import Image from 'next/image';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 // Utility types
 type FileStatus = 'idle' | 'processing' | 'uploading' | 'success' | 'error';
@@ -49,36 +50,48 @@ async function convertHeicToJpeg(file: File): Promise<File> {
   }
 }
 
+async function initPdfJs() {
+  try {
+    const pdfjsLib = await import('pdfjs-dist/webpack');
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      console.log('Initializing PDF.js worker');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+    }
+    return pdfjsLib;
+  } catch (error) {
+    console.error('Failed to initialize PDF.js:', error);
+    throw error;
+  }
+}
+
 async function convertPdfToJpeg(file: File): Promise<File> {
   if (typeof window === 'undefined') {
     throw new Error('PDF conversion can only happen in browser');
   }
 
   try {
-    const pdfjsLib = await import('pdfjs-dist');
-    // Update worker path to use CDN
-    const workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    const pdfjsLib = await initPdfJs();
+    console.log('Starting PDF conversion:', file.name);
 
-    // Add error logging
-    console.log('Converting PDF:', file.name);
-    
     const arrayBuffer = await file.arrayBuffer();
-    console.log('PDF loaded to buffer');
-    
-    const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
-    console.log('PDF parsed');
-    
+    console.log('File loaded to buffer, size:', arrayBuffer.byteLength);
+
+    const loadingTask = pdfjsLib.getDocument(new Uint8Array(arrayBuffer));
+    const pdf = await loadingTask.promise;
+    console.log('PDF document loaded, pages:', pdf.numPages);
+
     const page = await pdf.getPage(1);
-    console.log('Page loaded');
-
     const viewport = page.getViewport({ scale: 2.0 });
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Could not get canvas context');
+    console.log('PDF page loaded, viewport:', viewport.width, 'x', viewport.height);
 
+    const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Failed to get canvas context');
+    }
 
     // Set white background
     context.fillStyle = 'white';
@@ -92,28 +105,30 @@ async function convertPdfToJpeg(file: File): Promise<File> {
       }).promise;
       console.log('PDF rendered to canvas');
 
-      const blob = await new Promise<Blob>((resolve, reject) => {
+      return await new Promise((resolve, reject) => {
         canvas.toBlob(
           (blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error('Failed to convert canvas to blob'));
+            if (!blob) {
+              reject(new Error('Failed to convert canvas to blob'));
+              return;
+            }
+            const convertedFile = new File([blob], file.name.replace(/\.pdf$/i, '.jpg'), {
+              type: 'image/jpeg'
+            });
+            console.log('PDF converted to JPEG:', convertedFile.size, 'bytes');
+            resolve(convertedFile);
           },
           'image/jpeg',
           0.95
         );
       });
-      console.log('Canvas converted to blob');
-
-      return new File([blob], file.name.replace(/\.pdf$/i, '.jpg'), {
-        type: 'image/jpeg'
-      });
     } catch (renderError) {
       console.error('PDF render error:', renderError);
-      throw renderError;
+      throw new Error(`Failed to render PDF: ${renderError.message}`);
     }
   } catch (error) {
     console.error('PDF conversion failed:', error);
-    throw error;
+    throw new Error(`PDF conversion failed: ${error.message}`);
   }
 }
 
