@@ -121,13 +121,13 @@ async function convertPdfToJpeg(file: File): Promise<File> {
           0.95
         );
       });
-    } catch (renderError) {
-      console.error('PDF render error:', renderError);
-      throw new Error(`Failed to render PDF: ${renderError.message}`);
+    } catch (error: unknown) {
+      console.error('PDF render error:', error);
+      throw new Error('Failed to render PDF: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('PDF conversion failed:', error);
-    throw new Error(`PDF conversion failed: ${error.message}`);
+    throw new Error('PDF conversion failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }
 
